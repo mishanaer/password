@@ -58,7 +58,7 @@ function Slot(props: SlotProps & {
       layout
       aria-hidden="true"
       className={cn(
-        'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
+        'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl [corner-shape:superellipse(1.3)] bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
         props.isVerifying && 'fast-pulse text-[var(--deslop-primary-60)] duration-100',
       )}
       style={{ animationDelay: `${props.delay / props.speed}ms`, animationDuration: `${0.6 / props.speed}s` }}
@@ -68,7 +68,7 @@ function Slot(props: SlotProps & {
         <motion.div
           layoutId="indicator"
           className={cn(
-            'absolute inset-0 z-10 rounded-xl border-3',
+            'absolute inset-0 z-10 rounded-xl [corner-shape:superellipse(1.3)] border-3',
             props.isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]',
             props.isVerifying && 'border-none',
           )}
