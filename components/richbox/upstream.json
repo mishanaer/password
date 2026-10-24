@@ -1,0 +1,44 @@
+{
+  "sources": [
+    {
+      "url": "https://www.fluidfunctionalism.com/r/base/button.json",
+      "path": "components/ui/button.tsx",
+      "sha256": "e88b79a554d7ce4b13c3c26febd657e9a33429585f833928f37a726905b02bb7"
+    },
+    {
+      "url": "https://www.fluidfunctionalism.com/r/omit.json",
+      "path": "lib/omit.ts",
+      "sha256": "58b67fea6265a2f99cfabb508cae67eecb36587519212ccb7eb4fff214146bbd"
+    },
+    {
+      "url": "https://www.fluidfunctionalism.com/r/shape-context.json",
+      "path": "lib/shape-context.tsx",
+      "sha256": "c88e150726e3b3c0b133fa826942c976283f01252162538677db7dd96cb836c3"
+    },
+    {
+      "url": "https://www.fluidfunctionalism.com/r/icon-context.json",
+      "path": "lib/icon-types.ts",
+      "sha256": "60a37ca536e35a338b155e3404aeb4c8ef98d6cbd6f157778c66a6e77580455c",
+      "upstream_path": "lib/icon-context.tsx"
+    },
+    {
+      "url": "https://www.fluidfunctionalism.com/r/size-context.json",
+      "path": "lib/size-context.tsx",
+      "sha256": "3750783bc61b1560ffee48384a529ec0d34cd5a5d18abe830b34bc8a76ef4563"
+    },
+    {
+      "url": "https://www.fluidfunctionalism.com/r/size-context.json",
+      "path": "lib/type-scale.ts",
+      "sha256": "78c430d2e73f1c1d383d8ef5848c00e15ef020cecfc6145d407bed3b2fd0d574"
+    }
+  ],
+  "dependencies": [
+    "@base-ui/react@^1.9.0",
+    "class-variance-authority"
+  ],
+  "integration_changes": [
+    "React JSX import-source directive",
+    "@/ import aliases rewritten to relative paths; no component logic changed",
+    "Button icon type import points to icon-types.ts; the original type contract is retained without the unused icon registry."
+  ]
+}

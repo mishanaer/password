@@ -1,0 +1,63 @@
+'use client';
+
+import { useState, useSyncExternalStore } from 'react';
+import { useTheme } from 'next-themes';
+import { FamilyStyleOTP } from '@/components/snippets/family-style-otp';
+import { Button } from '@/components/richbox/components/ui/button';
+
+export function OTPPlayground() {
+  const [length, setLength] = useState<4 | 5 | 6>(6);
+  const [speed, setSpeed] = useState(1);
+  const { resolvedTheme, setTheme } = useTheme();
+  const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
+  const dark = mounted && resolvedTheme === 'dark';
+
+  return (
+    <main>
+      <section className="workspace" aria-label="OTP playground">
+        <div className="preview">
+          <div className="otp-stage">
+            <FamilyStyleOTP
+              length={length}
+              speed={speed}
+            />
+          </div>
+        </div>
+        <aside aria-label="OTP settings">
+          <div className="grid gap-5">
+            <div className="size-setting">
+              <label id="otp-length-label"><span>Code length</span></label>
+              <div role="group" aria-labelledby="otp-length-label" className="grid grid-cols-3 gap-2">
+                {([4, 5, 6] as const).map((value) => (
+                  <Button key={value} variant="tertiary" active={length === value}
+                    aria-pressed={length === value} onClick={() => setLength(value)}>
+                    {value}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="size-setting">
+              <label id="otp-speed-label"><span>Animation speed</span></label>
+              <div role="group" aria-labelledby="otp-speed-label" className="grid grid-cols-2 gap-2">
+                {[0.5, 1].map((value) => (
+                  <Button key={value} variant="tertiary" active={speed === value}
+                    aria-pressed={speed === value} onClick={() => setSpeed(value)}>
+                    {value}×
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <Button variant="tertiary"
+              aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`}
+              onClick={() => setTheme(dark ? 'light' : 'dark')}>
+              {dark ? 'Dark theme' : 'Light theme'}
+            </Button>
+            <Button variant="primary" asChild>
+              <a href="https://github.com/mishanaer/password" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </Button>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
