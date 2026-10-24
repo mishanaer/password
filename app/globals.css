@@ -11,6 +11,13 @@ body {
   color: var(--deslop-primary);
 }
 
+/* Safari's native password button otherwise covers the final custom slot. */
+[data-input-otp]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 body,
 main {
   --font-family-sans: var(--font-geist-sans), system-ui, sans-serif;
