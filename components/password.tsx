@@ -12,8 +12,8 @@ export interface PasswordProps {
   captureUnfocusedInput?: boolean;
 }
 
-const springTransition = (speed: number) => ({
-  type: 'spring' as const, visualDuration: 0.18 / speed, bounce: 0.15,
+const springTransition = (speed: number, visualDuration = 0.18) => ({
+  type: 'spring' as const, visualDuration: visualDuration / speed, bounce: 0.15,
 });
 const fadeTransition = (speed: number) => ({
   type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const,
@@ -39,7 +39,7 @@ function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: n
             transition: fadeTransition(speed),
           }}
           transition={{
-            y: springTransition(speed),
+            y: springTransition(speed, 0.15),
             opacity: fadeTransition(speed),
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
