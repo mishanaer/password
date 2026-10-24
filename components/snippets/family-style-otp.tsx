@@ -63,6 +63,7 @@ function Slot(props: SlotProps & {
   isShaking: boolean;
   isVerifying: boolean;
   delay: number;
+  pulseRepeatDelay: number;
   speed: number;
   mask: boolean;
 }) {
@@ -72,9 +73,20 @@ function Slot(props: SlotProps & {
       aria-hidden="true"
       className={cn(
         'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl [corner-shape:superellipse(1.3)] bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
-        props.isVerifying && 'fast-pulse text-[var(--deslop-primary-60)] duration-100',
+        props.isVerifying && 'text-[var(--deslop-primary-60)]',
       )}
-      style={{ animationDelay: `${props.delay / props.speed}ms`, animationDuration: `${0.6 / props.speed}s` }}
+      animate={{ opacity: props.isVerifying ? [1, 0.4, 1] : 1 }}
+      transition={{
+        opacity: props.isVerifying ? {
+          type: 'tween',
+          duration: 0.6 / props.speed,
+          delay: props.delay / props.speed / 1000,
+          ease: [0.42, 0, 0.58, 1],
+          times: [0, 0.5, 1],
+          repeat: Infinity,
+          repeatDelay: props.pulseRepeatDelay / props.speed,
+        } : { duration: 0 },
+      }}
     >
       <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} />
       {props.isActive ? (
@@ -236,7 +248,9 @@ export function FamilyStyleOTP({
                       transition={{ x: spring, y: spring, opacity: fade }}
                     >
                       <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
-                        delay={index * 100} speed={speed} mask={mask} />
+                        delay={index * 100} speed={speed} mask={mask}
+                        // Wait for the remaining slots, then hold the whole row for 200 ms.
+                        pulseRepeatDelay={(length - 1) * 0.1 + 0.2} />
                     </motion.div>
                   ))}
                   {length === 6 ? (
