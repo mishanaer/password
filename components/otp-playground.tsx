@@ -8,6 +8,7 @@ import { Button } from '@/components/richbox/components/ui/button';
 export function OTPPlayground() {
   const [length, setLength] = useState<4 | 5 | 6>(6);
   const [speed, setSpeed] = useState(1);
+  const [mask, setMask] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(() => () => undefined, () => true, () => false);
   const dark = mounted && resolvedTheme === 'dark';
@@ -20,6 +21,7 @@ export function OTPPlayground() {
             <FamilyStyleOTP
               length={length}
               speed={speed}
+              mask={mask}
             />
           </div>
         </div>
@@ -47,6 +49,10 @@ export function OTPPlayground() {
                 ))}
               </div>
             </div>
+            <Button variant="tertiary" active={mask} aria-pressed={mask}
+              onClick={() => setMask((value) => !value)}>
+              Mask
+            </Button>
             <Button variant="tertiary"
               aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`}
               onClick={() => setTheme(dark ? 'light' : 'dark')}>

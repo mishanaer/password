@@ -8,6 +8,7 @@ import { cn } from '@/components/richbox/lib/utils';
 export interface FamilyStyleOTPProps {
   length?: 4 | 5 | 6;
   speed?: number;
+  mask?: boolean;
 }
 
 const springTransition = (speed: number) => ({
@@ -18,10 +19,10 @@ const fadeTransition = (speed: number) => ({
 });
 
 // Digit entry uses a light spring; opacity and exit ease out.
-function AnimatedNumber({ value, speed }: { value: string | null; speed: number }) {
+function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: number; mask: boolean }) {
   return (
     <div className="relative flex h-[40px] w-[32px] items-center justify-center overflow-hidden">
-      <AnimatePresence initial={false} mode="wait">
+      <AnimatePresence key={mask ? 'masked' : 'plain'} initial={false} mode="wait">
         <motion.span
           key={value}
           initial={{ opacity: 0.25, y: 15 }}
@@ -37,7 +38,7 @@ function AnimatedNumber({ value, speed }: { value: string | null; speed: number 
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
         >
-          {value ?? '0'}
+          {value === null ? '0' : mask ? '*' : value}
         </motion.span>
       </AnimatePresence>
     </div>
@@ -49,6 +50,7 @@ function Slot(props: SlotProps & {
   isVerifying: boolean;
   delay: number;
   speed: number;
+  mask: boolean;
 }) {
   return (
     <motion.div
@@ -60,7 +62,7 @@ function Slot(props: SlotProps & {
       )}
       style={{ animationDelay: `${props.delay / props.speed}ms`, animationDuration: `${0.6 / props.speed}s` }}
     >
-      <AnimatedNumber value={props.char} speed={props.speed} />
+      <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} />
       {props.isActive ? (
         <motion.div
           layoutId="indicator"
@@ -80,6 +82,7 @@ function Slot(props: SlotProps & {
 export function FamilyStyleOTP({
   length = 6,
   speed = 1,
+  mask = false,
 }: FamilyStyleOTPProps) {
   const correctCode = '123456'.slice(0, length);
   const [value, setValue] = useState('');
@@ -154,6 +157,7 @@ export function FamilyStyleOTP({
             value={value}
             maxLength={length}
             inputMode="numeric"
+            type={mask ? 'password' : 'text'}
             autoComplete="one-time-code"
             pushPasswordManagerStrategy="none"
             containerClassName="group flex items-center"
@@ -192,7 +196,7 @@ export function FamilyStyleOTP({
                       transition={{ x: spring, y: spring, opacity: fade }}
                     >
                       <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
-                        delay={index * 100} speed={speed} />
+                        delay={index * 100} speed={speed} mask={mask} />
                     </motion.div>
                   ))}
                   {length === 6 ? (
