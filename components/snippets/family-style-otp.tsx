@@ -249,8 +249,8 @@ export function FamilyStyleOTP({
                     >
                       <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
                         delay={index * 100} speed={speed} mask={mask}
-                        // Wait for the remaining slots, then hold the whole row for 200 ms.
-                        pulseRepeatDelay={(length - 1) * 0.1 + 0.2} />
+                        // Wait for the remaining slots, then hold the whole row for 100 ms.
+                        pulseRepeatDelay={(length - 1) * 0.1 + 0.1} />
                     </motion.div>
                   ))}
                   {length === 6 ? (
