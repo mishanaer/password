@@ -160,15 +160,13 @@ export function FamilyStyleOTP({
   }, [correctCode, length]);
 
   const handleChange = useCallback((nextValue: string) => {
+    // Lock immediately, including events before React commits readOnly.
+    if (timeoutRef.current !== null) return;
     if (!/^\d*$/.test(nextValue)) {
       setIsShaking(true);
       return;
     }
     if (nextValue === value) return;
-    // A pending result belongs to the old code, never to this edit.
-    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
-    timeoutRef.current = null;
-    setIsVerifying(false);
     setValue(nextValue);
     setMessage('');
     if (nextValue.length === length) verifyCode(nextValue);
@@ -181,7 +179,7 @@ export function FamilyStyleOTP({
       if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^[0-9]$/.test(event.key)) return;
       const input = otpRef.current;
       const target = event.target;
-      if (!input || document.activeElement === input) return;
+      if (!input || timeoutRef.current !== null || document.activeElement === input) return;
       // Leave other editable controls and their keyboard behavior alone.
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"]'))) return;
 
@@ -219,6 +217,7 @@ export function FamilyStyleOTP({
             aria-describedby={`${id}-message`}
             aria-invalid={message === 'Invalid validation code'}
             aria-busy={isVerifying}
+            readOnly={isVerifying}
             value={value}
             maxLength={length}
             inputMode="numeric"
