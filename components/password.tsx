@@ -19,6 +19,11 @@ const fadeTransition = (speed: number) => ({
   type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const,
 });
 
+function blurIOSSelection(input: HTMLInputElement | null) {
+  // iOS paints selection handles above CSS. Dismiss them once editing is locked.
+  if (CSS.supports('-webkit-touch-callout', 'none')) input?.blur();
+}
+
 // Digit entry uses a light spring; opacity and exit ease out.
 function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: number; mask: boolean }) {
   return (
@@ -143,6 +148,7 @@ export function Password({
   const verifyCode = useCallback((code: string) => {
     if (timeoutRef.current !== null || code.length !== length) return;
     setIsVerifying(true);
+    blurIOSSelection(otpRef.current);
     setMessage('');
     timeoutRef.current = setTimeout(() => {
       if (code === correctCode) {
@@ -226,6 +232,9 @@ export function Password({
             autoComplete="one-time-code"
             pushPasswordManagerStrategy="none"
             containerClassName="group flex items-center"
+            onFocus={(event) => {
+              if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
+            }}
             onChange={handleChange}
             render={({ slots }) => (
               <motion.div
