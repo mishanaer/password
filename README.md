@@ -18,6 +18,7 @@ Open [localhost:3000](http://127.0.0.1:3000/). `/ui/otp` serves the same playgro
 - Select 4, 5, or 6 digits and animation speed 0.5× or 1×.
 - Toggle Mask to display entered digits as `*`. Empty cells keep their placeholder; toggling preserves the entered code and pending verification.
 - The first cell is focused on entry and after changing length.
+- In the playground, typing a digit outside the input focuses it and appends the digit. Other editable controls and keyboard shortcuts are left alone.
 - Six digits are split into two groups with a separator.
 - Completing the code starts a local check lasting exactly 2 seconds, independent of animation speed.
 - Editing cancels the previous check; a complete replacement starts a fresh check. Changing length or unmounting also cancels pending work.
@@ -28,7 +29,7 @@ Open [localhost:3000](http://127.0.0.1:3000/). `/ui/otp` serves the same playgro
 
 ## Component
 
-`components/snippets/family-style-otp.tsx` exports `FamilyStyleOTP`, with optional `length` (4/5/6, default 6), `speed` (default 1), and `mask` (default false) props. `components/otp-playground.tsx` adds the settings panel. The component uses the shared CSS and color tokens loaded by `app/globals.css`.
+`components/snippets/family-style-otp.tsx` exports `FamilyStyleOTP`, with optional `length` (4/5/6, default 6), `speed` (default 1), `mask` (default false), and `captureUnfocusedInput` (default false) props. `components/otp-playground.tsx` adds the settings panel. The component uses the shared CSS and color tokens loaded by `app/globals.css`.
 
 At 1×, digit and row movement uses Motion spring `visualDuration: 0.18`, `bounce: 0.15`; fades use `0.08 s`, `easeOut`. Focus movement uses `0.12 s`, `easeInOut`. Error shake lasts `0.3 s`. The verification pulse uses `0.6 s`, `ease-in-out`, with `0.1 s` spacing between cells. At 0.5× animation durations double. Cells stay 36×40 px with a 12 px radius.
 

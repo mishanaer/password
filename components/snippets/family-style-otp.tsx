@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { OTPInput, type SlotProps } from 'input-otp';
 import { cn } from '@/components/richbox/lib/utils';
 
@@ -9,6 +9,7 @@ export interface FamilyStyleOTPProps {
   length?: 4 | 5 | 6;
   speed?: number;
   mask?: boolean;
+  captureUnfocusedInput?: boolean;
 }
 
 const springTransition = (speed: number) => ({
@@ -83,6 +84,7 @@ export function FamilyStyleOTP({
   length = 6,
   speed = 1,
   mask = false,
+  captureUnfocusedInput = false,
 }: FamilyStyleOTPProps) {
   const correctCode = '123456'.slice(0, length);
   const [value, setValue] = useState('');
@@ -112,7 +114,7 @@ export function FamilyStyleOTP({
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
   }, []);
 
-  function verifyCode(code: string) {
+  const verifyCode = useCallback((code: string) => {
     if (timeoutRef.current !== null || code.length !== length) return;
     setIsVerifying(true);
     setMessage('');
@@ -130,7 +132,45 @@ export function FamilyStyleOTP({
       otpRef.current?.focus();
       otpRef.current?.setSelectionRange(0, 0);
     }, 2000);
-  }
+  }, [correctCode, length]);
+
+  const handleChange = useCallback((nextValue: string) => {
+    if (!/^\d*$/.test(nextValue)) {
+      setIsShaking(true);
+      return;
+    }
+    if (nextValue === value) return;
+    // A pending result belongs to the old code, never to this edit.
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    setIsVerifying(false);
+    setValue(nextValue);
+    setMessage('');
+    if (nextValue.length === length) verifyCode(nextValue);
+  }, [value, length, verifyCode]);
+
+  useEffect(() => {
+    if (!captureUnfocusedInput) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^[0-9]$/.test(event.key)) return;
+      const input = otpRef.current;
+      const target = event.target;
+      if (!input || document.activeElement === input) return;
+      // Leave other editable controls and their keyboard behavior alone.
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"]'))) return;
+
+      event.preventDefault();
+      input.focus({ preventScroll: true });
+      if (value.length < length) {
+        handleChange(value + event.key);
+        input.setSelectionRange(value.length + 1, value.length + 1);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [captureUnfocusedInput, handleChange, length, value]);
 
   return (
     <form
@@ -161,20 +201,7 @@ export function FamilyStyleOTP({
             autoComplete="one-time-code"
             pushPasswordManagerStrategy="none"
             containerClassName="group flex items-center"
-            onChange={(nextValue) => {
-              if (!/^\d*$/.test(nextValue)) {
-                setIsShaking(true);
-                return;
-              }
-              if (nextValue === value) return;
-              // A pending result belongs to the old code, never to this edit.
-              if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-              setIsVerifying(false);
-              setValue(nextValue);
-              setMessage('');
-              if (nextValue.length === length) verifyCode(nextValue);
-            }}
+            onChange={handleChange}
             render={({ slots }) => (
               <motion.div
                 className="relative h-10"

@@ -22,6 +22,7 @@ export function OTPPlayground() {
               length={length}
               speed={speed}
               mask={mask}
+              captureUnfocusedInput
             />
           </div>
         </div>
