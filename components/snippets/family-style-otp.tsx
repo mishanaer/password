@@ -39,7 +39,20 @@ function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: n
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
         >
-          {value === null ? '0' : mask ? '*' : value}
+          {value === null ? '0' : mask ? (
+            <svg
+              viewBox="0 0 12 12"
+              className="block size-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M6 1v10M1.67 3.5l8.66 5M1.67 8.5l8.66-5" />
+            </svg>
+          ) : value}
         </motion.span>
       </AnimatePresence>
     </div>
