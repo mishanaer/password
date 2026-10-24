@@ -184,7 +184,7 @@ export function FamilyStyleOTP({
       <LayoutGroup id={id}>
         <motion.div
           animate={isShaking ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
-          transition={{ duration: 0.3 / speed }}
+          transition={{ duration: 0.5 / speed }}
           onAnimationComplete={() => setIsShaking(false)}
         >
           <OTPInput
