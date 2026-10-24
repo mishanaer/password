@@ -1,5 +1,5 @@
 :root {
-  --deslop-surface: light-dark(#F5F5F5, #111111);
+  --deslop-surface: light-dark(#F0F0F0, #111111);
   --deslop-background: light-dark(#FFFFFF, #151515);
   --deslop-elevation-1: light-dark(#FFFFFF, #1D1D1D);
   --deslop-elevation-2: light-dark(#FFFFFF, #282828);
