@@ -2,10 +2,10 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
-import { FamilyStyleOTP } from '@/components/snippets/family-style-otp';
+import { Password } from '@/components/password';
 import { Button } from '@/components/richbox/components/ui/button';
 
-export function OTPPlayground() {
+export function PasswordPlayground() {
   const [length, setLength] = useState<4 | 5 | 6>(6);
   const [speed, setSpeed] = useState(1);
   const [mask, setMask] = useState(false);
@@ -15,10 +15,10 @@ export function OTPPlayground() {
 
   return (
     <main>
-      <section className="workspace" aria-label="OTP playground">
+      <section className="workspace" aria-label="Password playground">
         <div className="preview">
           <div className="otp-stage">
-            <FamilyStyleOTP
+            <Password
               length={length}
               speed={speed}
               mask={mask}
@@ -26,7 +26,7 @@ export function OTPPlayground() {
             />
           </div>
         </div>
-        <aside aria-label="OTP settings">
+        <aside aria-label="Password settings">
           <div className="grid gap-5">
             <div className="size-setting">
               <label id="otp-length-label"><span>Code length</span></label>

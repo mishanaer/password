@@ -1,0 +1,3 @@
+{
+  "buildCommand": "PASSWORD_BASE_PATH=/ui/password npm run build"
+}

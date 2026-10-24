@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { OTPInput, type SlotProps } from 'input-otp';
 import { cn } from '@/components/richbox/lib/utils';
 
-export interface FamilyStyleOTPProps {
+export interface PasswordProps {
   length?: 4 | 5 | 6;
   speed?: number;
   mask?: boolean;
@@ -106,12 +106,12 @@ function Slot(props: SlotProps & {
 }
 
 /** Adapted from Smintfy/ui-snippet. See LICENSE for the original MIT license. */
-export function FamilyStyleOTP({
+export function Password({
   length = 6,
   speed = 1,
   mask = false,
   captureUnfocusedInput = false,
-}: FamilyStyleOTPProps) {
+}: PasswordProps) {
   const correctCode = '123456'.slice(0, length);
   const [value, setValue] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);

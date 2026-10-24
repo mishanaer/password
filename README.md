@@ -9,7 +9,7 @@ npm ci
 npm run dev
 ```
 
-[Local demo](http://localhost:3000) · [Component](components/snippets/family-style-otp.tsx)
+[Demo](https://mishanaer.com/ui/password) · [Component](components/password.tsx)
 
 Demo codes: `1234`, `12345`, `123456`. No backend authentication.
 

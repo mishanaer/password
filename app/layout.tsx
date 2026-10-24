@@ -10,7 +10,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: 'OTP — MishaNaer',
+  title: 'Password — MishaNaer',
   description: 'An animated verification code input adapted from Smintfy/ui-snippet.',
 };
 
