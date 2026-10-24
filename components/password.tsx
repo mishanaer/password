@@ -157,12 +157,14 @@ export function Password({
         setIsShaking(true);
         setMessage('Invalid validation code');
       }
-      // Match upstream: both outcomes clear the digits and restore first-slot focus.
+      // Clear both outcomes; on iOS, wait for a tap before focusing again.
       setValue('');
       setIsVerifying(false);
       timeoutRef.current = null;
-      otpRef.current?.focus();
-      otpRef.current?.setSelectionRange(0, 0);
+      if (!CSS.supports('-webkit-touch-callout', 'none')) {
+        otpRef.current?.focus();
+        otpRef.current?.setSelectionRange(0, 0);
+      }
     }, 2000);
   }, [correctCode, length]);
 
