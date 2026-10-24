@@ -97,7 +97,7 @@ function Slot(props: SlotProps & {
             props.isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]',
             props.isVerifying && 'border-none',
           )}
-          style={{ transition: `border-color ${props.isShaking ? 0 : 120 / props.speed}ms ease-out` }}
+          style={{ transition: `border-color ${props.isShaking ? 0 : 150 / props.speed}ms ease-out` }}
           transition={{ duration: 0.12 / props.speed, ease: 'easeInOut' }}
         />
       ) : null}
