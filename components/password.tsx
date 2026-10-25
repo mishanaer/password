@@ -19,6 +19,11 @@ const fadeTransition = (speed: number) => ({
   type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const,
 });
 
+// Arabic-Indic, Persian and full-width digits. Each block starts at a code point ending in 0.
+const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g;
+const toAsciiDigits = (text: string) =>
+  text.replace(NON_ASCII_DIGITS, (digit) => String(digit.charCodeAt(0) & 0xf));
+
 function blurIOSSelection(input: HTMLInputElement | null) {
   // iOS paints selection handles above CSS. Dismiss them once editing is locked.
   if (CSS.supports('-webkit-touch-callout', 'none')) input?.blur();
@@ -168,9 +173,10 @@ export function Password({
     }, 2000);
   }, [correctCode, length]);
 
-  const handleChange = useCallback((nextValue: string) => {
+  const handleChange = useCallback((rawValue: string) => {
     // Lock immediately, including events before React commits readOnly.
     if (timeoutRef.current !== null) return;
+    const nextValue = toAsciiDigits(rawValue);
     if (!/^\d*$/.test(nextValue)) {
       setIsShaking(true);
       return;
@@ -181,11 +187,20 @@ export function Password({
     if (nextValue.length === length) verifyCode(nextValue);
   }, [value, length, verifyCode]);
 
+  // Codes are often copied as "123 456" or "123-456". Strip separators here,
+  // because the input's maxLength would cut the pasted text before onChange.
+  const handlePaste = useCallback((text: string) => {
+    const digits = toAsciiDigits(text).replace(/\D/g, '');
+    if (digits === '' && timeoutRef.current === null) setIsShaking(true);
+    return digits;
+  }, []);
+
   useEffect(() => {
     if (!captureUnfocusedInput) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^[0-9]$/.test(event.key)) return;
+      const digit = toAsciiDigits(event.key);
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^\d$/.test(digit)) return;
       const input = otpRef.current;
       const target = event.target;
       if (!input || timeoutRef.current !== null || document.activeElement === input) return;
@@ -195,7 +210,7 @@ export function Password({
       event.preventDefault();
       input.focus({ preventScroll: true });
       if (value.length < length) {
-        handleChange(value + event.key);
+        handleChange(value + digit);
         input.setSelectionRange(value.length + 1, value.length + 1);
       }
     }
@@ -238,6 +253,7 @@ export function Password({
               if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
             }}
             onChange={handleChange}
+            pasteTransformer={handlePaste}
             render={({ slots }) => (
               <motion.div
                 className="relative h-10"
