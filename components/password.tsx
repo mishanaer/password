@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { OTPInput, type SlotProps } from 'input-otp';
 import { cn } from '@/components/richbox/lib/utils';
@@ -12,12 +12,15 @@ export interface PasswordProps {
   captureUnfocusedInput?: boolean;
 }
 
-const springTransition = (speed: number, visualDuration = 0.18) => ({
-  type: 'spring' as const, visualDuration: visualDuration / speed, bounce: 0.15,
-});
-const fadeTransition = (speed: number) => ({
-  type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const,
-});
+// With reduced motion, every change applies instantly, fades included.
+const INSTANT = { duration: 0 } as const;
+
+const springTransition = (speed: number, reduceMotion: boolean, visualDuration = 0.18) => (
+  reduceMotion ? INSTANT : { type: 'spring' as const, visualDuration: visualDuration / speed, bounce: 0.15 }
+);
+const fadeTransition = (speed: number, reduceMotion: boolean) => (
+  reduceMotion ? INSTANT : { type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const }
+);
 
 function blurIOSSelection(input: HTMLInputElement | null) {
   // iOS paints selection handles above CSS. Dismiss them once editing is locked.
@@ -25,22 +28,27 @@ function blurIOSSelection(input: HTMLInputElement | null) {
 }
 
 // Digit entry uses a light spring; opacity and exit ease out.
-function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: number; mask: boolean }) {
+function AnimatedNumber({ value, speed, mask, reduceMotion }: {
+  value: string | null;
+  speed: number;
+  mask: boolean;
+  reduceMotion: boolean;
+}) {
   return (
     <div className="relative flex h-[40px] w-[32px] items-center justify-center overflow-hidden">
       <AnimatePresence key={mask ? 'masked' : 'plain'} initial={false} mode="wait">
         <motion.span
           key={value}
-          initial={{ opacity: 0.25, y: 15 }}
+          initial={reduceMotion ? false : { opacity: 0.25, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{
             opacity: 0,
             y: 0,
-            transition: fadeTransition(speed),
+            transition: fadeTransition(speed, reduceMotion),
           }}
           transition={{
-            y: springTransition(speed, 0.15),
-            opacity: fadeTransition(speed),
+            y: springTransition(speed, reduceMotion, 0.15),
+            opacity: fadeTransition(speed, reduceMotion),
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
         >
@@ -71,7 +79,9 @@ function Slot(props: SlotProps & {
   pulseRepeatDelay: number;
   speed: number;
   mask: boolean;
+  reduceMotion: boolean;
 }) {
+  const pulse = props.isVerifying && !props.reduceMotion;
   return (
     <motion.div
       layout
@@ -80,9 +90,9 @@ function Slot(props: SlotProps & {
         'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl [corner-shape:superellipse(1.3)] bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
         props.isVerifying && 'text-[var(--deslop-primary-60)]',
       )}
-      animate={{ opacity: props.isVerifying ? [1, 0.4, 1] : 1 }}
+      animate={{ opacity: pulse ? [1, 0.4, 1] : 1 }}
       transition={{
-        opacity: props.isVerifying ? {
+        opacity: pulse ? {
           type: 'tween',
           duration: 0.6 / props.speed,
           delay: props.delay / props.speed / 1000,
@@ -93,7 +103,7 @@ function Slot(props: SlotProps & {
         } : { duration: 0 },
       }}
     >
-      <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} />
+      <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} reduceMotion={props.reduceMotion} />
       {props.isActive ? (
         <motion.div
           layoutId="indicator"
@@ -102,8 +112,8 @@ function Slot(props: SlotProps & {
             props.isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]',
             props.isVerifying && 'border-none',
           )}
-          style={{ transition: `border-color ${props.isShaking ? 0 : 150 / props.speed}ms ease-out` }}
-          transition={{ duration: 0.12 / props.speed, ease: 'easeInOut' }}
+          style={{ transition: `border-color ${props.isShaking || props.reduceMotion ? 0 : 150 / props.speed}ms ease-out` }}
+          transition={props.reduceMotion ? INSTANT : { duration: 0.12 / props.speed, ease: 'easeInOut' }}
         />
       ) : null}
     </motion.div>
@@ -125,8 +135,9 @@ export function Password({
   const otpRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const id = useId();
-  const spring = springTransition(speed);
-  const fade = fadeTransition(speed);
+  const reduceMotion = useReducedMotion() ?? false;
+  const spring = springTransition(speed, reduceMotion);
+  const fade = fadeTransition(speed, reduceMotion);
   // Keep each cell at 36×40; animate spacing and row width without scaling it.
   const rowWidth = length * 36 + (length - 1) * 4 + (length === 6 ? 20 : 0);
 
@@ -144,6 +155,14 @@ export function Password({
   useEffect(() => () => {
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
   }, []);
+
+  // Clear the error after the shake. A timer rather than onAnimationComplete,
+  // so it also clears when reduced motion skips the shake.
+  useEffect(() => {
+    if (!isShaking) return;
+    const timeout = setTimeout(() => setIsShaking(false), 500 / speed);
+    return () => clearTimeout(timeout);
+  }, [isShaking, speed]);
 
   const verifyCode = useCallback((code: string) => {
     if (timeoutRef.current !== null || code.length !== length) return;
@@ -215,9 +234,8 @@ export function Password({
     >
       <LayoutGroup id={id}>
         <motion.div
-          animate={isShaking ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
+          animate={isShaking && !reduceMotion ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
           transition={{ duration: 0.5 / speed }}
-          onAnimationComplete={() => setIsShaking(false)}
         >
           <OTPInput
             ref={otpRef}
@@ -253,13 +271,13 @@ export function Password({
                       // Transformed cell wrappers create separate stacking contexts.
                       // Keep the moving focus ring above neighboring cell surfaces.
                       style={{ zIndex: slot.isActive ? 1 : 0 }}
-                      initial={{ opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
                       animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
                       exit={{ opacity: 0 }}
                       transition={{ x: spring, y: spring, opacity: fade }}
                     >
                       <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
-                        delay={index * 100} speed={speed} mask={mask}
+                        delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
                         // Start the next wave as soon as the last slot finishes.
                         pulseRepeatDelay={(length - 1) * 0.1} />
                     </motion.div>
@@ -269,7 +287,7 @@ export function Password({
                       key="separator"
                       aria-hidden="true"
                       className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
-                      initial={{ opacity: 0 }}
+                      initial={reduceMotion ? false : { opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={fade}
