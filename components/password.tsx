@@ -97,7 +97,6 @@ function Slot(props: SlotProps & {
   const pulse = props.isVerifying && !props.reduceMotion;
   return (
     <motion.div
-      layout
       aria-hidden="true"
       className={cn(
         'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl [corner-shape:superellipse(1.3)] bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
@@ -151,7 +150,7 @@ export function Password({
   const reduceMotion = useReducedMotion() ?? false;
   const spring = springTransition(speed, reduceMotion);
   const fade = fadeTransition(speed, reduceMotion);
-  // Keep each cell at 36×40; animate spacing and row width without scaling it.
+  // Keep each cell at 36×40. Only transforms animate when the length changes.
   const rowWidth = length * 36 + (length - 1) * 4 + (length === 6 ? 20 : 0);
 
   useLayoutEffect(() => {
@@ -293,46 +292,45 @@ export function Password({
             }}
             pasteTransformer={handlePaste}
             render={({ slots }) => (
-              <motion.div
-                className="relative h-10"
-                initial={false}
-                animate={{ width: rowWidth }}
-                transition={spring}
-              >
-                <AnimatePresence initial={false}>
-                  {slots.map((slot, index) => (
-                    <motion.div
-                      key={index}
-                      className="absolute left-0 top-0"
-                      // Transformed cell wrappers create separate stacking contexts.
-                      // Keep the moving focus ring above neighboring cell surfaces.
-                      style={{ zIndex: slot.isActive ? 1 : 0 }}
-                      initial={reduceMotion ? false : { opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
-                      animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
-                      exit={{ opacity: 0 }}
-                      transition={{ x: spring, y: spring, opacity: fade }}
-                      onUpdate={keepOnMainThread}
-                    >
-                      <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
-                        delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
-                        // Start the next wave as soon as the last slot finishes.
-                        pulseRepeatDelay={(length - 1) * 0.1} />
-                    </motion.div>
-                  ))}
-                  {length === 6 ? (
-                    <motion.div
-                      key="separator"
-                      aria-hidden="true"
-                      className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
-                      initial={reduceMotion ? false : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={fade}
-                      onUpdate={keepOnMainThread}
-                    />
-                  ) : null}
-                </AnimatePresence>
-              </motion.div>
+              // The row snaps to its new width. If that shifts it (it's centered in the demo),
+              // this layer glides it over with a transform, so layout never animates.
+              <div className="relative h-10" style={{ width: rowWidth }}>
+                <motion.div layout="position" className="absolute inset-0" transition={spring}>
+                  <AnimatePresence initial={false}>
+                    {slots.map((slot, index) => (
+                      <motion.div
+                        key={index}
+                        className="absolute left-0 top-0"
+                        // Transformed cell wrappers create separate stacking contexts.
+                        // Keep the moving focus ring above neighboring cell surfaces.
+                        style={{ zIndex: slot.isActive ? 1 : 0 }}
+                        initial={reduceMotion ? false : { opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
+                        animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
+                        exit={{ opacity: 0 }}
+                        transition={{ x: spring, y: spring, opacity: fade }}
+                        onUpdate={keepOnMainThread}
+                      >
+                        <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
+                          delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
+                          // Start the next wave as soon as the last slot finishes.
+                          pulseRepeatDelay={(length - 1) * 0.1} />
+                      </motion.div>
+                    ))}
+                    {length === 6 ? (
+                      <motion.div
+                        key="separator"
+                        aria-hidden="true"
+                        className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
+                        initial={reduceMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={fade}
+                        onUpdate={keepOnMainThread}
+                      />
+                    ) : null}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
             )}
           />
         </motion.div>
