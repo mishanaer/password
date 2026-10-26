@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { OTPInput, type SlotProps } from 'input-otp';
 import { cn } from '@/components/richbox/lib/utils';
@@ -301,80 +301,78 @@ export function Password({
         verifyCode(value);
       }}
     >
-      <LayoutGroup id={id}>
-        <motion.div
-          animate={isShaking && !reduceMotion ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
-          transition={{ duration: 0.5 / speed }}
-        >
-          <OTPInput
-            ref={otpRef}
-            autoFocus
-            aria-label={`${length}-digit verification code`}
-            aria-describedby={`${id}-message`}
-            aria-invalid={message === 'Invalid validation code'}
-            aria-busy={isVerifying}
-            readOnly={isVerifying}
-            value={value}
-            maxLength={length}
-            inputMode="numeric"
-            type={mask ? 'password' : 'text'}
-            autoComplete="one-time-code"
-            pushPasswordManagerStrategy="none"
-            containerClassName="group flex items-center"
-            onFocus={(event) => {
-              if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
-            }}
-            onChange={handleChange}
-            // A pasted full code replaces the field; input-otp would insert it at the caret ("12" + "123456"
-            // gives "121234"). The capture phase runs this before input-otp's own paste handler.
-            onPasteCapture={(event) => {
-              if (digitsOnly(event.clipboardData.getData('text/plain')).length < length) return;
-              event.currentTarget.setSelectionRange(0, event.currentTarget.value.length);
-            }}
-            pasteTransformer={handlePaste}
-            render={({ slots }) => (
-              // The row snaps to its new width. If that shifts it (it's centered in the demo),
-              // this layer glides it over with a transform, so layout never animates.
-              <div className="relative h-10" style={{ width: rowWidth }}>
-                <motion.div layout="position" className="absolute inset-0" transition={spring}>
-                  <AnimatePresence initial={false}>
-                    {slots.map((slot, index) => (
-                      <motion.div
-                        key={index}
-                        className="absolute left-0 top-0"
-                        initial={reduceMotion ? false : { opacity: 0, y: 15, x: slotX(index) }}
-                        animate={{ opacity: 1, y: 0, x: slotX(index) }}
-                        exit={{ opacity: 0 }}
-                        transition={{ x: spring, y: spring, opacity: fade }}
-                        onUpdate={keepOnMainThread}
-                      >
-                        <Slot {...slot} isVerifying={isVerifying}
-                          delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
-                          // Start the next wave as soon as the last slot finishes.
-                          pulseRepeatDelay={(length - 1) * 0.1} />
-                      </motion.div>
-                    ))}
-                    {length === 6 ? (
-                      <motion.div
-                        key="separator"
-                        aria-hidden="true"
-                        className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
-                        initial={reduceMotion ? false : { opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={fade}
-                        onUpdate={keepOnMainThread}
-                      />
-                    ) : null}
-                  </AnimatePresence>
-                  <FocusRing slots={slots} slotX={slotX} isShaking={isShaking} isVerifying={isVerifying}
-                    speed={speed} reduceMotion={reduceMotion} />
-                </motion.div>
-              </div>
-            )}
-          />
-        </motion.div>
-      </LayoutGroup>
+      <motion.div
+        animate={isShaking && !reduceMotion ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
+        transition={{ duration: 0.5 / speed }}
+      >
+        <OTPInput
+          ref={otpRef}
+          autoFocus
+          aria-label={`${length}-digit verification code`}
+          aria-describedby={`${id}-message`}
+          aria-invalid={message === 'Invalid validation code'}
+          aria-busy={isVerifying}
+          readOnly={isVerifying}
+          value={value}
+          maxLength={length}
+          inputMode="numeric"
+          type={mask ? 'password' : 'text'}
+          autoComplete="one-time-code"
+          pushPasswordManagerStrategy="none"
+          containerClassName="group flex items-center"
+          onFocus={(event) => {
+            if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
+          }}
+          onChange={handleChange}
+          // A pasted full code replaces the field; input-otp would insert it at the caret ("12" + "123456"
+          // gives "121234"). The capture phase runs this before input-otp's own paste handler.
+          onPasteCapture={(event) => {
+            if (digitsOnly(event.clipboardData.getData('text/plain')).length < length) return;
+            event.currentTarget.setSelectionRange(0, event.currentTarget.value.length);
+          }}
+          pasteTransformer={handlePaste}
+          render={({ slots }) => (
+            // The row snaps to its new width. If that shifts it (it's centered in the demo),
+            // this layer glides it over with a transform, so layout never animates.
+            <div className="relative h-10" style={{ width: rowWidth }}>
+              <motion.div layout="position" className="absolute inset-0" transition={spring}>
+                <AnimatePresence initial={false}>
+                  {slots.map((slot, index) => (
+                    <motion.div
+                      key={index}
+                      className="absolute left-0 top-0"
+                      initial={reduceMotion ? false : { opacity: 0, y: 15, x: slotX(index) }}
+                      animate={{ opacity: 1, y: 0, x: slotX(index) }}
+                      exit={{ opacity: 0 }}
+                      transition={{ x: spring, y: spring, opacity: fade }}
+                      onUpdate={keepOnMainThread}
+                    >
+                      <Slot {...slot} isVerifying={isVerifying}
+                        delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
+                        // Start the next wave as soon as the last slot finishes.
+                        pulseRepeatDelay={(length - 1) * 0.1} />
+                    </motion.div>
+                  ))}
+                  {length === 6 ? (
+                    <motion.div
+                      key="separator"
+                      aria-hidden="true"
+                      className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
+                      initial={reduceMotion ? false : { opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={fade}
+                      onUpdate={keepOnMainThread}
+                    />
+                  ) : null}
+                </AnimatePresence>
+                <FocusRing slots={slots} slotX={slotX} isShaking={isShaking} isVerifying={isVerifying}
+                  speed={speed} reduceMotion={reduceMotion} />
+              </motion.div>
+            </div>
+          )}
+        />
+      </motion.div>
       <span id={`${id}-message`} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {isVerifying ? 'Verifying your code…' : message}
       </span>
