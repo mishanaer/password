@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { OTPInput, type SlotProps } from 'input-otp';
 import { cn } from '@/components/richbox/lib/utils';
@@ -12,37 +12,58 @@ export interface PasswordProps {
   captureUnfocusedInput?: boolean;
 }
 
-const springTransition = (speed: number, visualDuration = 0.18) => ({
-  type: 'spring' as const, visualDuration: visualDuration / speed, bounce: 0.15,
-});
-const fadeTransition = (speed: number) => ({
-  type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const,
-});
+// With reduced motion, every change applies instantly, fades included.
+const INSTANT = { duration: 0 } as const;
+
+const springTransition = (speed: number, reduceMotion: boolean, visualDuration = 0.18) => (
+  reduceMotion ? INSTANT : { type: 'spring' as const, visualDuration: visualDuration / speed, bounce: 0.15 }
+);
+const fadeTransition = (speed: number, reduceMotion: boolean) => (
+  reduceMotion ? INSTANT : { type: 'tween' as const, duration: 0.08 / speed, ease: 'easeOut' as const }
+);
+
+// Arabic-Indic, Persian and full-width digits. Each block starts at a code point ending in 0.
+const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g;
+const toAsciiDigits = (text: string) =>
+  text.replace(NON_ASCII_DIGITS, (digit) => String(digit.charCodeAt(0) & 0xf));
+const digitsOnly = (text: string) => toAsciiDigits(text).replace(/\D/g, '');
 
 function blurIOSSelection(input: HTMLInputElement | null) {
   // iOS paints selection handles above CSS. Dismiss them once editing is locked.
   if (CSS.supports('-webkit-touch-callout', 'none')) input?.blur();
 }
 
+// Motion runs opacity on the browser's animation engine (WAAPI) unless the element has onUpdate.
+// In motion-dom 12.43 the element shows its stale inline opacity for one frame after that animation
+// ends: a fade-out flashes back to full, a fade-in dips back to its start. Passing onUpdate keeps
+// these small fades on Motion's own frame loop, which writes every frame.
+const keepOnMainThread = () => {};
+
 // Digit entry uses a light spring; opacity and exit ease out.
-function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: number; mask: boolean }) {
+function AnimatedNumber({ value, speed, mask, reduceMotion }: {
+  value: string | null;
+  speed: number;
+  mask: boolean;
+  reduceMotion: boolean;
+}) {
   return (
     <div className="relative flex h-[40px] w-[32px] items-center justify-center overflow-hidden">
       <AnimatePresence key={mask ? 'masked' : 'plain'} initial={false} mode="wait">
         <motion.span
           key={value}
-          initial={{ opacity: 0.25, y: 15 }}
+          initial={reduceMotion ? false : { opacity: 0.25, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{
             opacity: 0,
             y: 0,
-            transition: fadeTransition(speed),
+            transition: fadeTransition(speed, reduceMotion),
           }}
           transition={{
-            y: springTransition(speed, 0.15),
-            opacity: fadeTransition(speed),
+            y: springTransition(speed, reduceMotion, 0.15),
+            opacity: fadeTransition(speed, reduceMotion),
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
+          onUpdate={keepOnMainThread}
         >
           {value === null ? '0' : mask ? (
             <svg
@@ -65,24 +86,24 @@ function AnimatedNumber({ value, speed, mask }: { value: string | null; speed: n
 }
 
 function Slot(props: SlotProps & {
-  isShaking: boolean;
   isVerifying: boolean;
   delay: number;
   pulseRepeatDelay: number;
   speed: number;
   mask: boolean;
+  reduceMotion: boolean;
 }) {
+  const pulse = props.isVerifying && !props.reduceMotion;
   return (
     <motion.div
-      layout
       aria-hidden="true"
       className={cn(
         'relative flex h-[40px] w-[36px] items-center justify-center rounded-xl [corner-shape:superellipse(1.3)] bg-[var(--deslop-elevation-1)] text-base font-semibold text-foreground',
         props.isVerifying && 'text-[var(--deslop-primary-60)]',
       )}
-      animate={{ opacity: props.isVerifying ? [1, 0.4, 1] : 1 }}
+      animate={{ opacity: pulse ? [1, 0.4, 1] : 1 }}
       transition={{
-        opacity: props.isVerifying ? {
+        opacity: pulse ? {
           type: 'tween',
           duration: 0.6 / props.speed,
           delay: props.delay / props.speed / 1000,
@@ -93,20 +114,61 @@ function Slot(props: SlotProps & {
         } : { duration: 0 },
       }}
     >
-      <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} />
-      {props.isActive ? (
-        <motion.div
-          layoutId="indicator"
-          className={cn(
-            'absolute inset-0 z-10 rounded-xl [corner-shape:superellipse(1.3)] border-3',
-            props.isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]',
-            props.isVerifying && 'border-none',
-          )}
-          style={{ transition: `border-color ${props.isShaking ? 0 : 150 / props.speed}ms ease-out` }}
-          transition={{ duration: 0.12 / props.speed, ease: 'easeInOut' }}
-        />
-      ) : null}
+      <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} reduceMotion={props.reduceMotion} />
     </motion.div>
+  );
+}
+
+// One ring for the whole row: it wraps the caret cell, or stretches over every selected cell
+// (Cmd+A, Shift+arrows). It's three pieces so it can stretch with transforms only: two half-cell
+// caps carry the rounded corners and side borders and slide, and a middle piece with just the top
+// and bottom borders scales on x, which doesn't thicken horizontal borders.
+const RING_CAP = 18;
+const RING_MIDDLE = 100; // the middle piece's width before scaling
+
+function FocusRing({ slots, slotX, isShaking, isVerifying, speed, reduceMotion }: {
+  slots: SlotProps[];
+  slotX: (index: number) => number;
+  isShaking: boolean;
+  isVerifying: boolean;
+  speed: number;
+  reduceMotion: boolean;
+}) {
+  const activeIndexes = slots.flatMap((slot, index) => (slot.isActive ? [index] : []));
+  if (activeIndexes.length === 0) return null;
+  const left = slotX(activeIndexes[0]);
+  const right = slotX(activeIndexes[activeIndexes.length - 1]) + 36;
+  // Stretching over a selection is a resize, so it shares the cells' resize spring, which retargets
+  // smoothly as Shift+arrows extend it. Caret moves and collapsing keep the quicker 120ms glide.
+  const glide = reduceMotion ? INSTANT : { duration: 0.12 / speed, ease: 'easeInOut' as const };
+  const transition = activeIndexes.length > 1 ? springTransition(speed, reduceMotion) : glide;
+  const piece = cn('absolute left-0 top-0 h-[40px]', isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]');
+  const borderTransition = `border-color ${isShaking || reduceMotion ? 0 : 150 / speed}ms ease-out`;
+  return (
+    <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0 z-10', isVerifying && 'invisible')}>
+      <motion.div
+        className={cn(piece, 'rounded-l-xl border-y-3 border-l-3 [corner-shape:superellipse(1.3)]')}
+        style={{ width: RING_CAP, transition: borderTransition }}
+        initial={false}
+        animate={{ x: left }}
+        transition={transition}
+      />
+      {/* Overlaps each cap by 1px so no hairline shows at the joins. */}
+      <motion.div
+        className={cn(piece, 'border-y-3')}
+        style={{ width: RING_MIDDLE, originX: 0, transition: borderTransition }}
+        initial={false}
+        animate={{ x: left + RING_CAP - 1, scaleX: (right - left - 2 * RING_CAP + 2) / RING_MIDDLE }}
+        transition={transition}
+      />
+      <motion.div
+        className={cn(piece, 'rounded-r-xl border-y-3 border-r-3 [corner-shape:superellipse(1.3)]')}
+        style={{ width: RING_CAP, transition: borderTransition }}
+        initial={false}
+        animate={{ x: right - RING_CAP }}
+        transition={transition}
+      />
+    </div>
   );
 }
 
@@ -125,10 +187,12 @@ export function Password({
   const otpRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const id = useId();
-  const spring = springTransition(speed);
-  const fade = fadeTransition(speed);
-  // Keep each cell at 36×40; animate spacing and row width without scaling it.
+  const reduceMotion = useReducedMotion() ?? false;
+  const spring = springTransition(speed, reduceMotion);
+  const fade = fadeTransition(speed, reduceMotion);
+  // Keep each cell at 36×40. Only transforms animate when the length changes.
   const rowWidth = length * 36 + (length - 1) * 4 + (length === 6 ? 20 : 0);
+  const slotX = (index: number) => index * 40 + (length === 6 && index >= 3 ? 20 : 0);
 
   useLayoutEffect(() => {
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
@@ -144,6 +208,14 @@ export function Password({
   useEffect(() => () => {
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
   }, []);
+
+  // Clear the error after the shake. A timer rather than onAnimationComplete,
+  // so it also clears when reduced motion skips the shake.
+  useEffect(() => {
+    if (!isShaking) return;
+    const timeout = setTimeout(() => setIsShaking(false), 500 / speed);
+    return () => clearTimeout(timeout);
+  }, [isShaking, speed]);
 
   const verifyCode = useCallback((code: string) => {
     if (timeoutRef.current !== null || code.length !== length) return;
@@ -168,9 +240,10 @@ export function Password({
     }, 2000);
   }, [correctCode, length]);
 
-  const handleChange = useCallback((nextValue: string) => {
+  const handleChange = useCallback((rawValue: string) => {
     // Lock immediately, including events before React commits readOnly.
     if (timeoutRef.current !== null) return;
+    const nextValue = toAsciiDigits(rawValue);
     if (!/^\d*$/.test(nextValue)) {
       setIsShaking(true);
       return;
@@ -181,11 +254,20 @@ export function Password({
     if (nextValue.length === length) verifyCode(nextValue);
   }, [value, length, verifyCode]);
 
+  // Codes are often copied as "123 456" or "123-456". Strip separators here,
+  // because the input's maxLength would cut the pasted text before onChange.
+  const handlePaste = useCallback((text: string) => {
+    const digits = digitsOnly(text);
+    if (digits === '' && timeoutRef.current === null) setIsShaking(true);
+    return digits;
+  }, []);
+
   useEffect(() => {
     if (!captureUnfocusedInput) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^[0-9]$/.test(event.key)) return;
+      const digit = toAsciiDigits(event.key);
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !/^\d$/.test(digit)) return;
       const input = otpRef.current;
       const target = event.target;
       if (!input || timeoutRef.current !== null || document.activeElement === input) return;
@@ -195,7 +277,7 @@ export function Password({
       event.preventDefault();
       input.focus({ preventScroll: true });
       if (value.length < length) {
-        handleChange(value + event.key);
+        handleChange(value + digit);
         input.setSelectionRange(value.length + 1, value.length + 1);
       }
     }
@@ -210,56 +292,63 @@ export function Password({
       aria-label="Verification code"
       onSubmit={(event) => {
         event.preventDefault();
+        if (value.length < length) {
+          // Toggling a trailing no-break space changes the text, so a repeat Enter is announced again.
+          const prompt = `Enter all ${length} digits`;
+          setMessage((current) => (current === prompt ? prompt + String.fromCharCode(160) : prompt));
+          return;
+        }
         verifyCode(value);
       }}
     >
-      <LayoutGroup id={id}>
-        <motion.div
-          animate={isShaking ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
-          transition={{ duration: 0.5 / speed }}
-          onAnimationComplete={() => setIsShaking(false)}
-        >
-          <OTPInput
-            ref={otpRef}
-            autoFocus
-            aria-label={`${length}-digit verification code`}
-            aria-describedby={`${id}-message`}
-            aria-invalid={message === 'Invalid validation code'}
-            aria-busy={isVerifying}
-            readOnly={isVerifying}
-            value={value}
-            maxLength={length}
-            inputMode="numeric"
-            type={mask ? 'password' : 'text'}
-            autoComplete="one-time-code"
-            pushPasswordManagerStrategy="none"
-            containerClassName="group flex items-center"
-            onFocus={(event) => {
-              if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
-            }}
-            onChange={handleChange}
-            render={({ slots }) => (
-              <motion.div
-                className="relative h-10"
-                initial={false}
-                animate={{ width: rowWidth }}
-                transition={spring}
-              >
+      <motion.div
+        animate={isShaking && !reduceMotion ? { x: [0, -5, 5, -2.5, 2.5, 0] } : { x: 0 }}
+        transition={{ duration: 0.5 / speed }}
+      >
+        <OTPInput
+          ref={otpRef}
+          autoFocus
+          aria-label={`${length}-digit verification code`}
+          aria-describedby={`${id}-message`}
+          aria-invalid={message === 'Invalid validation code'}
+          aria-busy={isVerifying}
+          readOnly={isVerifying}
+          value={value}
+          maxLength={length}
+          inputMode="numeric"
+          type={mask ? 'password' : 'text'}
+          autoComplete="one-time-code"
+          pushPasswordManagerStrategy="none"
+          containerClassName="group flex items-center"
+          onFocus={(event) => {
+            if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
+          }}
+          onChange={handleChange}
+          // A pasted full code replaces the field; input-otp would insert it at the caret ("12" + "123456"
+          // gives "121234"). The capture phase runs this before input-otp's own paste handler.
+          onPasteCapture={(event) => {
+            if (digitsOnly(event.clipboardData.getData('text/plain')).length < length) return;
+            event.currentTarget.setSelectionRange(0, event.currentTarget.value.length);
+          }}
+          pasteTransformer={handlePaste}
+          render={({ slots }) => (
+            // The row snaps to its new width. If that shifts it (it's centered in the demo),
+            // this layer glides it over with a transform, so layout never animates.
+            <div className="relative h-10" style={{ width: rowWidth }}>
+              <motion.div layout="position" className="absolute inset-0" transition={spring}>
                 <AnimatePresence initial={false}>
                   {slots.map((slot, index) => (
                     <motion.div
                       key={index}
                       className="absolute left-0 top-0"
-                      // Transformed cell wrappers create separate stacking contexts.
-                      // Keep the moving focus ring above neighboring cell surfaces.
-                      style={{ zIndex: slot.isActive ? 1 : 0 }}
-                      initial={{ opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
-                      animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
+                      initial={reduceMotion ? false : { opacity: 0, y: 15, x: slotX(index) }}
+                      animate={{ opacity: 1, y: 0, x: slotX(index) }}
                       exit={{ opacity: 0 }}
                       transition={{ x: spring, y: spring, opacity: fade }}
+                      onUpdate={keepOnMainThread}
                     >
-                      <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
-                        delay={index * 100} speed={speed} mask={mask}
+                      <Slot {...slot} isVerifying={isVerifying}
+                        delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
                         // Start the next wave as soon as the last slot finishes.
                         pulseRepeatDelay={(length - 1) * 0.1} />
                     </motion.div>
@@ -269,18 +358,21 @@ export function Password({
                       key="separator"
                       aria-hidden="true"
                       className="absolute left-[124px] top-[19px] h-0.5 w-2 rounded-full bg-[var(--deslop-primary-20)]"
-                      initial={{ opacity: 0 }}
+                      initial={reduceMotion ? false : { opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={fade}
+                      onUpdate={keepOnMainThread}
                     />
                   ) : null}
                 </AnimatePresence>
+                <FocusRing slots={slots} slotX={slotX} isShaking={isShaking} isVerifying={isVerifying}
+                  speed={speed} reduceMotion={reduceMotion} />
               </motion.div>
-            )}
-          />
-        </motion.div>
-      </LayoutGroup>
+            </div>
+          )}
+        />
+      </motion.div>
       <span id={`${id}-message`} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {isVerifying ? 'Verifying your code…' : message}
       </span>
