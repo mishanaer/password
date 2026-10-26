@@ -86,7 +86,6 @@ function AnimatedNumber({ value, speed, mask, reduceMotion }: {
 }
 
 function Slot(props: SlotProps & {
-  isShaking: boolean;
   isVerifying: boolean;
   delay: number;
   pulseRepeatDelay: number;
@@ -116,19 +115,60 @@ function Slot(props: SlotProps & {
       }}
     >
       <AnimatedNumber value={props.char} speed={props.speed} mask={props.mask} reduceMotion={props.reduceMotion} />
-      {props.isActive ? (
-        <motion.div
-          layoutId="indicator"
-          className={cn(
-            'absolute inset-0 z-10 rounded-xl [corner-shape:superellipse(1.3)] border-3',
-            props.isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]',
-            props.isVerifying && 'border-none',
-          )}
-          style={{ transition: `border-color ${props.isShaking || props.reduceMotion ? 0 : 150 / props.speed}ms ease-out` }}
-          transition={props.reduceMotion ? INSTANT : { duration: 0.12 / props.speed, ease: 'easeInOut' }}
-        />
-      ) : null}
     </motion.div>
+  );
+}
+
+// One ring for the whole row: it wraps the caret cell, or stretches over every selected cell
+// (Cmd+A, Shift+arrows). It's three pieces so it can stretch with transforms only: two half-cell
+// caps carry the rounded corners and side borders and slide, and a middle piece with just the top
+// and bottom borders scales on x, which doesn't thicken horizontal borders.
+const RING_CAP = 18;
+const RING_MIDDLE = 100; // the middle piece's width before scaling
+
+function FocusRing({ slots, slotX, isShaking, isVerifying, speed, reduceMotion }: {
+  slots: SlotProps[];
+  slotX: (index: number) => number;
+  isShaking: boolean;
+  isVerifying: boolean;
+  speed: number;
+  reduceMotion: boolean;
+}) {
+  const activeIndexes = slots.flatMap((slot, index) => (slot.isActive ? [index] : []));
+  if (activeIndexes.length === 0) return null;
+  const left = slotX(activeIndexes[0]);
+  const right = slotX(activeIndexes[activeIndexes.length - 1]) + 36;
+  // Stretching over a selection is a resize, so it shares the cells' resize spring, which retargets
+  // smoothly as Shift+arrows extend it. Caret moves and collapsing keep the quicker 120ms glide.
+  const glide = reduceMotion ? INSTANT : { duration: 0.12 / speed, ease: 'easeInOut' as const };
+  const transition = activeIndexes.length > 1 ? springTransition(speed, reduceMotion) : glide;
+  const piece = cn('absolute left-0 top-0 h-[40px]', isShaking ? 'border-[var(--accent-red)]' : 'border-[var(--accent-blue)]');
+  const borderTransition = `border-color ${isShaking || reduceMotion ? 0 : 150 / speed}ms ease-out`;
+  return (
+    <div aria-hidden="true" className={cn('pointer-events-none absolute inset-0 z-10', isVerifying && 'invisible')}>
+      <motion.div
+        className={cn(piece, 'rounded-l-xl border-y-3 border-l-3 [corner-shape:superellipse(1.3)]')}
+        style={{ width: RING_CAP, transition: borderTransition }}
+        initial={false}
+        animate={{ x: left }}
+        transition={transition}
+      />
+      {/* Overlaps each cap by 1px so no hairline shows at the joins. */}
+      <motion.div
+        className={cn(piece, 'border-y-3')}
+        style={{ width: RING_MIDDLE, originX: 0, transition: borderTransition }}
+        initial={false}
+        animate={{ x: left + RING_CAP - 1, scaleX: (right - left - 2 * RING_CAP + 2) / RING_MIDDLE }}
+        transition={transition}
+      />
+      <motion.div
+        className={cn(piece, 'rounded-r-xl border-y-3 border-r-3 [corner-shape:superellipse(1.3)]')}
+        style={{ width: RING_CAP, transition: borderTransition }}
+        initial={false}
+        animate={{ x: right - RING_CAP }}
+        transition={transition}
+      />
+    </div>
   );
 }
 
@@ -152,6 +192,7 @@ export function Password({
   const fade = fadeTransition(speed, reduceMotion);
   // Keep each cell at 36×40. Only transforms animate when the length changes.
   const rowWidth = length * 36 + (length - 1) * 4 + (length === 6 ? 20 : 0);
+  const slotX = (index: number) => index * 40 + (length === 6 && index >= 3 ? 20 : 0);
 
   useLayoutEffect(() => {
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
@@ -301,16 +342,13 @@ export function Password({
                       <motion.div
                         key={index}
                         className="absolute left-0 top-0"
-                        // Transformed cell wrappers create separate stacking contexts.
-                        // Keep the moving focus ring above neighboring cell surfaces.
-                        style={{ zIndex: slot.isActive ? 1 : 0 }}
-                        initial={reduceMotion ? false : { opacity: 0, y: 15, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
-                        animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
+                        initial={reduceMotion ? false : { opacity: 0, y: 15, x: slotX(index) }}
+                        animate={{ opacity: 1, y: 0, x: slotX(index) }}
                         exit={{ opacity: 0 }}
                         transition={{ x: spring, y: spring, opacity: fade }}
                         onUpdate={keepOnMainThread}
                       >
-                        <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
+                        <Slot {...slot} isVerifying={isVerifying}
                           delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
                           // Start the next wave as soon as the last slot finishes.
                           pulseRepeatDelay={(length - 1) * 0.1} />
@@ -329,6 +367,8 @@ export function Password({
                       />
                     ) : null}
                   </AnimatePresence>
+                  <FocusRing slots={slots} slotX={slotX} isShaking={isShaking} isVerifying={isVerifying}
+                    speed={speed} reduceMotion={reduceMotion} />
                 </motion.div>
               </div>
             )}
