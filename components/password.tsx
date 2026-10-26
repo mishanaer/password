@@ -225,6 +225,12 @@ export function Password({
       aria-label="Verification code"
       onSubmit={(event) => {
         event.preventDefault();
+        if (value.length < length) {
+          // Toggling a trailing no-break space changes the text, so a repeat Enter is announced again.
+          const prompt = `Enter all ${length} digits`;
+          setMessage((current) => (current === prompt ? prompt + String.fromCharCode(160) : prompt));
+          return;
+        }
         verifyCode(value);
       }}
     >
