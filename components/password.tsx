@@ -23,6 +23,7 @@ const fadeTransition = (speed: number) => ({
 const NON_ASCII_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\uFF10-\uFF19]/g;
 const toAsciiDigits = (text: string) =>
   text.replace(NON_ASCII_DIGITS, (digit) => String(digit.charCodeAt(0) & 0xf));
+const digitsOnly = (text: string) => toAsciiDigits(text).replace(/\D/g, '');
 
 function blurIOSSelection(input: HTMLInputElement | null) {
   // iOS paints selection handles above CSS. Dismiss them once editing is locked.
@@ -190,7 +191,7 @@ export function Password({
   // Codes are often copied as "123 456" or "123-456". Strip separators here,
   // because the input's maxLength would cut the pasted text before onChange.
   const handlePaste = useCallback((text: string) => {
-    const digits = toAsciiDigits(text).replace(/\D/g, '');
+    const digits = digitsOnly(text);
     if (digits === '' && timeoutRef.current === null) setIsShaking(true);
     return digits;
   }, []);
@@ -259,6 +260,12 @@ export function Password({
               if (timeoutRef.current !== null) blurIOSSelection(event.currentTarget);
             }}
             onChange={handleChange}
+            // A pasted full code replaces the field; input-otp would insert it at the caret ("12" + "123456"
+            // gives "121234"). The capture phase runs this before input-otp's own paste handler.
+            onPasteCapture={(event) => {
+              if (digitsOnly(event.clipboardData.getData('text/plain')).length < length) return;
+              event.currentTarget.setSelectionRange(0, event.currentTarget.value.length);
+            }}
             pasteTransformer={handlePaste}
             render={({ slots }) => (
               <motion.div
