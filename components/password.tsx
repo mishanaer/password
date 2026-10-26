@@ -27,6 +27,12 @@ function blurIOSSelection(input: HTMLInputElement | null) {
   if (CSS.supports('-webkit-touch-callout', 'none')) input?.blur();
 }
 
+// Motion runs opacity on the browser's animation engine (WAAPI) unless the element has onUpdate.
+// In motion-dom 12.43 the element shows its stale inline opacity for one frame after that animation
+// ends: a fade-out flashes back to full, a fade-in dips back to its start. Passing onUpdate keeps
+// these small fades on Motion's own frame loop, which writes every frame.
+const keepOnMainThread = () => {};
+
 // Digit entry uses a light spring; opacity and exit ease out.
 function AnimatedNumber({ value, speed, mask, reduceMotion }: {
   value: string | null;
@@ -51,6 +57,7 @@ function AnimatedNumber({ value, speed, mask, reduceMotion }: {
             opacity: fadeTransition(speed, reduceMotion),
           }}
           className={cn('absolute', value === null && 'text-[var(--deslop-primary-40)]')}
+          onUpdate={keepOnMainThread}
         >
           {value === null ? '0' : mask ? (
             <svg
@@ -275,6 +282,7 @@ export function Password({
                       animate={{ opacity: 1, y: 0, x: index * 40 + (length === 6 && index >= 3 ? 20 : 0) }}
                       exit={{ opacity: 0 }}
                       transition={{ x: spring, y: spring, opacity: fade }}
+                      onUpdate={keepOnMainThread}
                     >
                       <Slot {...slot} isShaking={isShaking} isVerifying={isVerifying}
                         delay={index * 100} speed={speed} mask={mask} reduceMotion={reduceMotion}
@@ -291,6 +299,7 @@ export function Password({
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={fade}
+                      onUpdate={keepOnMainThread}
                     />
                   ) : null}
                 </AnimatePresence>
